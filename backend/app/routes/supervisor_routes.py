@@ -1,4 +1,5 @@
-# app/routes/supervisor_routes.py
+# app/routes/supervisor_routes.py - FIXED VERSION
+
 import uuid
 from datetime import datetime, date
 from typing import Optional, List, Dict, Any
@@ -106,7 +107,9 @@ def get_supervisor_stats(
                 "linea_numero": line_number,
                 "mechanic_name": mechanic_name,
                 "resolution_minutes": ticket.resolution_minutes,
-                "created_at": ticket.created_at,
+                "created_at": ticket.created_at.isoformat() if ticket.created_at else None,
+                "completed_at": ticket.completed_at.isoformat() if ticket.completed_at else None,
+                "closed_at": ticket.closed_at.isoformat() if ticket.closed_at else None,
             })
         
         return {
@@ -132,7 +135,7 @@ def get_supervisor_stats(
 
 
 # ==========================================
-# GET LINE PERFORMANCE
+# GET LINE PERFORMANCE - FIXED
 # ==========================================
 @router.get("/lines/performance")
 def get_lines_performance(
@@ -152,13 +155,25 @@ def get_lines_performance(
             
             total = len(tickets)
             closed = len([t for t in tickets if t.status == TicketStatus.cerrado])
-            delayed = len([t for t in tickets if t.delayed])
             
-            total_minutes = sum(t.resolution_minutes or 0 for t in tickets)
-            avg_time = round(total_minutes / len(tickets), 1) if tickets else 0
+            # Calculate total minutes only for tickets with resolution_minutes
+            tickets_with_time = [t for t in tickets if t.resolution_minutes is not None]
+            total_minutes = sum(t.resolution_minutes or 0 for t in tickets_with_time)
+            avg_time = round(total_minutes / len(tickets_with_time), 1) if tickets_with_time else 0
             
             # Active tickets count
             active = len([t for t in tickets if t.status in [TicketStatus.pendiente, TicketStatus.asignado, TicketStatus.en_proceso]])
+            
+            # Prepare tickets data for frontend afectacion calculation
+            tickets_for_calc = []
+            for ticket in tickets:
+                tickets_for_calc.append({
+                    "id": str(ticket.id),
+                    "status": ticket.status.value if hasattr(ticket.status, "value") else str(ticket.status),
+                    "resolution_minutes": ticket.resolution_minutes,
+                    "completed_at": ticket.completed_at.isoformat() if ticket.completed_at else None,
+                    "closed_at": ticket.closed_at.isoformat() if ticket.closed_at else None,
+                })
             
             result.append({
                 "linea_id": str(line.id),
@@ -167,9 +182,9 @@ def get_lines_performance(
                 "total_tickets": total,
                 "closed_tickets": closed,
                 "active_tickets": active,
-                "delayed_tickets": delayed,
                 "avg_resolution_minutes": avg_time,
                 "completion_rate": round((closed / total) * 100, 1) if total > 0 else 0,
+                "tickets": tickets_for_calc,  # Add tickets for frontend calculation
             })
         
         return {
@@ -179,11 +194,13 @@ def get_lines_performance(
         
     except Exception as e:
         print(f"Error in get_lines_performance: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==========================================
-# GET MECHANICS PERFORMANCE
+# GET MECHANICS PERFORMANCE - FIXED
 # ==========================================
 @router.get("/mechanics/performance")
 def get_mechanics_performance(
@@ -201,13 +218,25 @@ def get_mechanics_performance(
             
             total = len(tickets)
             closed = len([t for t in tickets if t.status == TicketStatus.cerrado])
-            delayed = len([t for t in tickets if t.delayed])
             
-            total_minutes = sum(t.resolution_minutes or 0 for t in tickets)
-            avg_time = round(total_minutes / len(tickets), 1) if tickets else 0
+            # Calculate total minutes only for tickets with resolution_minutes
+            tickets_with_time = [t for t in tickets if t.resolution_minutes is not None]
+            total_minutes = sum(t.resolution_minutes or 0 for t in tickets_with_time)
+            avg_time = round(total_minutes / len(tickets_with_time), 1) if tickets_with_time else 0
             
             # Active tickets count
             active = len([t for t in tickets if t.status in [TicketStatus.pendiente, TicketStatus.asignado, TicketStatus.en_proceso]])
+            
+            # Prepare tickets data for frontend afectacion calculation
+            tickets_for_calc = []
+            for ticket in tickets:
+                tickets_for_calc.append({
+                    "id": str(ticket.id),
+                    "status": ticket.status.value if hasattr(ticket.status, "value") else str(ticket.status),
+                    "resolution_minutes": ticket.resolution_minutes,
+                    "completed_at": ticket.completed_at.isoformat() if ticket.completed_at else None,
+                    "closed_at": ticket.closed_at.isoformat() if ticket.closed_at else None,
+                })
             
             result.append({
                 "mecanico_id": str(mechanic.id),
@@ -216,10 +245,10 @@ def get_mechanics_performance(
                 "total_tickets": total,
                 "closed_tickets": closed,
                 "active_tickets": active,
-                "delayed_tickets": delayed,
                 "avg_resolution_minutes": avg_time,
                 "completion_rate": round((closed / total) * 100, 1) if total > 0 else 0,
                 "current_location": mechanic.current_location,
+                "tickets": tickets_for_calc,  # Add tickets for frontend calculation
             })
         
         # Sort by completion rate descending
@@ -232,6 +261,8 @@ def get_mechanics_performance(
         
     except Exception as e:
         print(f"Error in get_mechanics_performance: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
