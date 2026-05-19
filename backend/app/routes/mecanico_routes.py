@@ -118,6 +118,7 @@ def get_my_tickets(
             "resolution_minutes": getattr(ticket, 'resolution_minutes', None),
             "delayed": getattr(ticket, 'delayed', False),
             "completed_at": str(ticket.completed_at) if ticket.completed_at else None,
+            "closed_at": str(ticket.closed_at) if ticket.closed_at else None,  # ← ADD THIS LINE
         })
 
     return {

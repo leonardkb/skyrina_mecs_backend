@@ -56,13 +56,18 @@ def get_supervisor_stats(
             Ticket.status == TicketStatus.completado
         ).count()
         
-        # Calculate average resolution time
-        total_minutes = sum(t.resolution_minutes or 0 for t in completed_tickets)
-        avg_resolution = round(total_minutes / len(completed_tickets), 1) if completed_tickets else 0
+        # ========== FIX: Calculate average resolution time for CLOSED tickets only ==========
+        closed_tickets_only = db.query(Ticket).filter(
+            Ticket.status == TicketStatus.cerrado
+        ).all()
+        
+        total_minutes = sum(t.resolution_minutes or 0 for t in closed_tickets_only)
+        avg_resolution = round(total_minutes / len(closed_tickets_only), 1) if closed_tickets_only else 0
+        # ========== END FIX ==========
         
         # Calculate global KPIs
         total_assigned = len(all_tickets)
-        total_closed = len([t for t in completed_tickets if t.status == TicketStatus.cerrado])
+        total_closed = len(closed_tickets_only)
         
         # Afectación (Completion Rate)
         afectacion = round((total_closed / total_assigned) * 100, 1) if total_assigned > 0 else 0
@@ -73,8 +78,8 @@ def get_supervisor_stats(
         cambios = round((closed_style_changes / len(style_changes)) * 100, 1) if style_changes else 100
         
         # Orden (Quality - on time)
-        delayed_tickets = len([t for t in completed_tickets if t.delayed])
-        orden = round(((len(completed_tickets) - delayed_tickets) / len(completed_tickets)) * 100, 1) if completed_tickets else 100
+        on_time_closed = len([t for t in closed_tickets_only if (t.resolution_minutes or 0) <= 7])
+        orden = round((on_time_closed / len(closed_tickets_only)) * 100, 1) if closed_tickets_only else 100
         
         # Get tickets for the table (last 20)
         recent_tickets = db.query(Ticket).order_by(Ticket.created_at.desc()).limit(20).all()
@@ -115,7 +120,7 @@ def get_supervisor_stats(
         return {
             "success": True,
             "stats": {
-                "avgClosing": avg_resolution,
+                "avgClosing": avg_resolution,  # Now only closed tickets
                 "activeTickets": active_tickets,
                 "pendingValidation": pending_validation,
                 "totalTickets": total_assigned,
@@ -132,8 +137,6 @@ def get_supervisor_stats(
     except Exception as e:
         print(f"Error in get_supervisor_stats: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
 # ==========================================
 # GET LINE PERFORMANCE - FIXED
 # ==========================================
